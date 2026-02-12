@@ -46,7 +46,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.pichillilorenzo.flutter_browser"
+        applicationId "com.ideomobile.hapoalim"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion 34
         versionCode flutterVersionCode.toInteger()
