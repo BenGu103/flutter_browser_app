@@ -1,0 +1,65 @@
+name: "Android Release"
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # 1. משיכת הקוד (ללא ref: master, כדי למשוך את התגית הנכונה)
+      - uses: actions/checkout@v4
+
+      # 2. הגדרת Java
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: "17"
+          cache: 'gradle'
+
+      # 3. הגדרת Flutter
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.x'
+          cache: true
+
+      # 4. יצירת קובץ ה-Keystore מתוך ה-Secrets
+      - name: Download Android keystore
+        id: android_keystore
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: keystore.jks
+          encodedString: ${{ secrets.KEYSTORE_BASE64 }}
+
+      # 5. יצירת קובץ key.properties עם הסיסמאות
+      - name: Create key.properties
+        run: |
+          echo "storeFile=${{ steps.android_keystore.outputs.filePath }}" > android/key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+
+      # 6. הורדת חבילות
+      - name: Restore packages
+        run: flutter pub get
+
+      # 7. בניית ה-APK (מפוצל לפי ארכיטקטורה, כמו שביקשת)
+      - name: Build APK
+        run: flutter build apk --release --split-per-abi
+
+      # 8. יצירת Release בגיטהאב והעלאת הקבצים
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Release ${{ github.ref_name }}"
+          token: ${{ secrets.TOKEN }}
+          files: |
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
